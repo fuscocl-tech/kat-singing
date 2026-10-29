@@ -20,7 +20,7 @@ service cloud.firestore {
 
     // GENERATED:fields:start
     function intakeFields() {
-      return ['full_name', 'preferred_name', 'pronouns', 'date_of_birth', 'suburb_postcode', 'phone', 'email', 'school_year', 'preferred_lesson_time', 'guardian_name', 'guardian_phone', 'guardian_email', 'guardian2_name', 'guardian2_contact', 'emergency_name', 'emergency_phone', 'voice_flags', 'voice_details', 'voice_demands', 'had_lessons', 'lessons_duration', 'ensemble_experience', 'instruments', 'performance_experience', 'reads_music', 'practice_frequency', 'learning_history', 'genres', 'favourite_artists', 'songs_to_learn', 'songs_to_avoid', 'languages', 'goal_areas', 'goal_other', 'top_goals', 'upcoming_event', 'success_factors', 'learning_style', 'access_needs', 'practice_time', 'anything_else', 'signature_name', 'signature_date'];
+      return ['full_name', 'preferred_name', 'date_of_birth', 'suburb_postcode', 'phone', 'email', 'school_year', 'preferred_lesson_time', 'guardian_name', 'guardian_relationship', 'guardian_phone', 'guardian_email', 'emergency_name', 'emergency_phone', 'voice_flags', 'voice_details', 'voice_demands', 'had_lessons', 'lessons_duration', 'ensemble_experience', 'instruments', 'performance_experience', 'reads_music', 'practice_frequency', 'learning_history', 'genres', 'favourite_artists', 'songs_to_learn', 'songs_to_avoid', 'goal_areas', 'goal_other', 'upcoming_event', 'success_factors', 'learning_style', 'access_needs', 'practice_time', 'anything_else'];
     }
     // GENERATED:fields:end
 
@@ -39,8 +39,7 @@ service cloud.firestore {
         && data.updatedAt == request.time
         && answers is map
         && answers.keys().hasOnly(intakeFields())
-        && isText(answers.full_name, 200) && answers.full_name.size() > 0
-        && isText(answers.signature_name, 200) && answers.signature_name.size() > 0;
+        && isText(answers.full_name, 200) && answers.full_name.size() > 0;
     }
 
     match /students/{studentId} {

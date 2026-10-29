@@ -2,7 +2,7 @@
 
 A small CRM and new-student intake form for a singing teacher. It runs entirely on Firebase's free **Spark** plan.
 
-- **`/intake`** is the public "New Singing Student Intake Form". It has eight sections, worded as in the studio's form:
+- **`/intake`** is the public "New Singing Student Intake Form". It has seven sections, worded as in the studio's form:
   1. student details
   2. parent / caregiver and emergency contacts (required for students under 18)
   3. voice history and vocal wellbeing
@@ -10,7 +10,8 @@ A small CRM and new-student intake form for a singing teacher. It runs entirely 
   5. musical tastes
   6. goals for vocal tuition
   7. learning preferences
-  8. acknowledgement and signature
+
+  After submitting, the visitor lands on a thank-you page (`/intake/thanks`).
 - **`/admin`** is the teacher's CRM. Kat signs in with her Google account. It has:
   - a student list with status filters (New enquiry → Trial booked → Active / Waitlist / Paused / Former) and search
   - a record page for each student with their full intake answers, status and lesson rate

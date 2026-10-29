@@ -48,7 +48,6 @@ function StudentPage() {
           <p className="muted">
             {[
               a.preferred_name && a.full_name,
-              a.pronouns,
               age !== null ? `${age} years old` : "",
               a.suburb_postcode,
               `${s.source === "intake" ? "Submitted intake form" : "Added"} ${formatDate(s.created_at)}`,

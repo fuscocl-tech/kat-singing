@@ -4,12 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "emulators": "firebase emulators:start --only auth,firestore",
+    "emulators": "npx firebase-tools emulators:start --only auth,firestore",
     "rules": "node scripts/sync-rules.mts",
     "prebuild": "node scripts/sync-rules.mts --check",
     "build": "next build",
     "typecheck": "tsc --noEmit",
-    "deploy": "npm run build && firebase deploy --only hosting,firestore:rules"
+    "deploy": "npm run build && npx firebase-tools deploy --only hosting,firestore:rules"
   },
   "dependencies": {
     "firebase": "^13.1.0",

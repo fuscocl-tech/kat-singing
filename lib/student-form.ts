@@ -1,5 +1,5 @@
 // The intake form, defined once. It drives the public form, the teacher's edit form,
-// the student record page and the database columns (see lib/db.ts).
+// the student record page and the CSV export and the Firestore rules field list.
 // Wording follows the studio's "New Singing Student Intake Form" document.
 
 export type FieldType = "text" | "email" | "tel" | "date" | "textarea" | "radio" | "checks";
@@ -27,9 +27,6 @@ export type FormSection = {
 
 export const INTAKE_INTRO =
   "Please complete as much as you feel comfortable sharing. Health information is requested only to help plan safe, appropriate vocal tuition. You may discuss sensitive details privately with your teacher.";
-
-export const ACKNOWLEDGEMENT =
-  "The information provided will be used to plan vocal tuition and should be handled confidentially. Singing tuition is not a substitute for medical assessment; persistent pain, hoarseness or voice loss should be discussed with a qualified healthcare professional.";
 
 export const VOICE_FLAGS = [
   "My voice is currently comfortable for speaking and singing",
@@ -59,8 +56,7 @@ export const FORM_SECTIONS: FormSection[] = [
     title: "Student details",
     fields: [
       { name: "full_name", label: "Full name", type: "text", required: true, autoComplete: "name" },
-      { name: "preferred_name", label: "Preferred name", type: "text", hint: "Optional", half: true },
-      { name: "pronouns", label: "Pronouns", type: "text", hint: "Optional", half: true },
+      { name: "preferred_name", label: "Preferred name", type: "text", hint: "Optional" },
       { name: "date_of_birth", label: "Date of birth", type: "date", required: true, half: true },
       { name: "suburb_postcode", label: "Home suburb / postcode", type: "text", half: true, autoComplete: "address-level2" },
       { name: "phone", label: "Phone (if applicable)", type: "tel", half: true, autoComplete: "tel" },
@@ -73,11 +69,10 @@ export const FORM_SECTIONS: FormSection[] = [
     title: "Parent / caregiver & emergency contacts",
     description: "Complete for students under 18, or where a caregiver is involved.",
     fields: [
-      { name: "guardian_name", label: "Parent / caregiver name and relationship", type: "text", hint: "e.g. Jane Smith (mother)" },
+      { name: "guardian_name", label: "Primary parent / caregiver name", type: "text", half: true },
+      { name: "guardian_relationship", label: "Relationship to student", type: "text", hint: "e.g. Mother, Father, Grandparent", half: true },
       { name: "guardian_phone", label: "Phone number", type: "tel", half: true },
       { name: "guardian_email", label: "Email address", type: "email", half: true },
-      { name: "guardian2_name", label: "Second parent / caregiver", type: "text", hint: "Optional", half: true },
-      { name: "guardian2_contact", label: "Second contact phone / email", type: "text", half: true },
       { name: "emergency_name", label: "Emergency contact name and relationship", type: "text", half: true },
       { name: "emergency_phone", label: "Emergency contact phone", type: "tel", half: true },
     ],
@@ -128,8 +123,7 @@ export const FORM_SECTIONS: FormSection[] = [
       { name: "genres", label: "Favourite genres / styles", type: "text", half: true },
       { name: "favourite_artists", label: "Favourite singers / bands", type: "text", half: true },
       { name: "songs_to_learn", label: "Songs you love to sing or would like to learn", type: "textarea" },
-      { name: "songs_to_avoid", label: "Styles or songs you would prefer to avoid", type: "text", half: true },
-      { name: "languages", label: "Languages you enjoy singing in", type: "text", hint: "Optional", half: true },
+      { name: "songs_to_avoid", label: "Styles or songs you would prefer to avoid", type: "text" },
     ],
   },
   {
@@ -137,7 +131,6 @@ export const FORM_SECTIONS: FormSection[] = [
     fields: [
       { name: "goal_areas", label: "What would you most like to work on? Tick all that apply.", type: "checks", options: GOAL_AREAS },
       { name: "goal_other", label: "Other", type: "text", hint: "If you ticked Other, tell me more" },
-      { name: "top_goals", label: "What are your top 1–3 goals for the next 3–6 months?", type: "textarea" },
       { name: "upcoming_event", label: "Is there an upcoming performance, audition or event you are preparing for?", type: "textarea" },
       { name: "success_factors", label: "What would make singing lessons feel enjoyable, safe and successful for you?", type: "textarea" },
     ],
@@ -154,21 +147,6 @@ export const FORM_SECTIONS: FormSection[] = [
       { name: "access_needs", label: "Access or learning needs / adjustments you would like the teacher to know", type: "textarea", hint: "Optional" },
       { name: "practice_time", label: "Practice time available between lessons (approximate)", type: "text" },
       { name: "anything_else", label: "Anything else you would like your teacher to know?", type: "textarea" },
-    ],
-  },
-  {
-    title: "Acknowledgement",
-    description: ACKNOWLEDGEMENT,
-    fields: [
-      {
-        name: "signature_name",
-        label: "Student / parent or caregiver signature",
-        type: "text",
-        hint: "Type your full name. A parent or caregiver should sign for students under 18.",
-        required: true,
-        half: true,
-      },
-      { name: "signature_date", label: "Date", type: "date", half: true },
     ],
   },
 ];
@@ -218,9 +196,7 @@ export function parseStudentForm(formData: FormData, mode: "intake" | "admin") {
   for (const name of ["email", "guardian_email"]) {
     if (input[name] && !EMAIL_RE.test(input[name])) errors[name] = "That email address doesn't look right.";
   }
-  for (const name of ["date_of_birth", "signature_date"]) {
-    if (input[name] && ageFrom(input[name]) === null) errors[name] = "Please enter a valid date.";
-  }
+  if (input.date_of_birth && ageFrom(input.date_of_birth) === null) errors.date_of_birth = "Please enter a valid date.";
 
   if (mode === "intake") {
     for (const field of ALL_FIELDS) {

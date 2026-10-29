@@ -100,7 +100,12 @@ export default function Dashboard() {
                     <Link href={`/admin/student?id=${id}`} className="row-link">
                       {displayName(a)}
                     </Link>
-                    {a.guardian_name && <div className="muted small">{a.guardian_name}</div>}
+                    {a.guardian_name && (
+                      <div className="muted small">
+                        {a.guardian_name}
+                        {a.guardian_relationship && ` (${a.guardian_relationship.toLowerCase()})`}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <StatusPill status={status} />

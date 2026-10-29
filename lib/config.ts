@@ -1,5 +1,5 @@
 export const studio = {
-  name: "Kat's Singing Studio",
+  name: "KK Voice Tuition",
   timeZone: "Australia/Sydney",
 };
 
