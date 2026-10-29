@@ -14,7 +14,7 @@ service cloud.firestore {
 
     // GENERATED:admins:start
     function adminEmails() {
-      return ['fuscocl@gmail.com'];
+      return ['fuscocl@gmail.com', 'katfusco@gmail.com'];
     }
     // GENERATED:admins:end
 

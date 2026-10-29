@@ -2,6 +2,7 @@
 // after editing, run `npm run rules` and deploy the rules (see README).
 export const ADMIN_EMAILS: string[] = [
   "fuscocl@gmail.com",
+  "katfusco@gmail.com",
 ];
 
 export function isAdminEmail(email: string | null | undefined) {
