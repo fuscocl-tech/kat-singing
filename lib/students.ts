@@ -1,12 +1,15 @@
 import "server-only";
-import { getDb } from "./db";
+import { FieldValue, Timestamp, type DocumentSnapshot } from "firebase-admin/firestore";
+import { db } from "./firebase";
 import { ALL_FIELDS, type StudentInput } from "./student-form";
 import { STATUSES, type Status } from "./options";
 
-const INPUT_COLUMNS = ALL_FIELDS.map((f) => f.name);
+// Firestore layout:
+//   students/{id}              { status, source, lessonRate, answers: {…}, createdAt, updatedAt }
+//   students/{id}/notes/{id}   { kind, body, createdAt }
 
 export type Student = {
-  id: number;
+  id: string;
   created_at: string;
   updated_at: string;
   status: Status;
@@ -16,100 +19,110 @@ export type Student = {
   answers: StudentInput;
 };
 
-type Row = Omit<Student, "answers"> & Record<string, unknown>;
-
-function toStudent(row: Row): Student {
-  const answers: StudentInput = {};
-  for (const name of INPUT_COLUMNS) answers[name] = String(row[name] ?? "");
-  return {
-    id: row.id,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    status: row.status,
-    source: row.source,
-    lesson_rate: row.lesson_rate,
-    answers,
-  };
-}
-
 export type Note = {
-  id: number;
-  student_id: number;
+  id: string;
   created_at: string;
   kind: string;
   body: string;
 };
 
+const students = db.collection("students");
+const notesOf = (studentId: string) => students.doc(studentId).collection("notes");
 
-export function listStudents({ q, status }: { q?: string; status?: string }) {
-  const where: string[] = [];
-  const params: Record<string, string> = {};
-  if (status) {
-    where.push("status = @status");
-    params.status = status;
-  }
-  if (q) {
-    where.push(
-      `(full_name || ' ' || preferred_name || ' ' || email || ' ' || phone || ' ' || guardian_name || ' ' || guardian_email || ' ' || guardian_phone) LIKE @q`,
-    );
-    params.q = `%${q}%`;
-  }
-  const sql = `SELECT * FROM students ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-    ORDER BY CASE status WHEN 'enquiry' THEN 0 ELSE 1 END, created_at DESC`;
-  return (getDb().prepare(sql).all(params) as Row[]).map(toStudent);
+function iso(value: unknown) {
+  return value instanceof Timestamp ? value.toDate().toISOString() : "";
 }
 
-export function statusCounts() {
-  const rows = getDb().prepare("SELECT status, COUNT(*) AS n FROM students GROUP BY status").all() as {
-    status: string;
-    n: number;
-  }[];
+function toStudent(doc: DocumentSnapshot): Student {
+  const data = doc.data() ?? {};
+  const stored = (data.answers ?? {}) as Record<string, unknown>;
+  const answers: StudentInput = {};
+  for (const field of ALL_FIELDS) answers[field.name] = String(stored[field.name] ?? "");
+  return {
+    id: doc.id,
+    created_at: iso(data.createdAt),
+    updated_at: iso(data.updatedAt),
+    status: data.status ?? "enquiry",
+    source: data.source ?? "intake",
+    lesson_rate: data.lessonRate ?? "",
+    answers,
+  };
+}
+
+async function allStudents() {
+  const snapshot = await students.orderBy("createdAt", "desc").get();
+  return snapshot.docs.map(toStudent);
+}
+
+// A teaching studio has at most a few hundred students, so filtering in memory is simpler
+// than maintaining Firestore indexes for every search.
+export async function listStudents({ q, status }: { q?: string; status?: string } = {}) {
+  const needle = q?.toLowerCase();
+  return (await allStudents())
+    .filter((s) => !status || s.status === status)
+    .filter((s) => {
+      if (!needle) return true;
+      const a = s.answers;
+      return [a.full_name, a.preferred_name, a.email, a.phone, a.guardian_name, a.guardian_email, a.guardian_phone]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    })
+    .sort((x, y) => Number(y.status === "enquiry") - Number(x.status === "enquiry"));
+}
+
+export async function statusCounts() {
   const counts = Object.fromEntries(STATUSES.map((s) => [s.value, 0])) as Record<string, number>;
-  for (const row of rows) counts[row.status] = row.n;
+  for (const s of await allStudents()) counts[s.status] = (counts[s.status] ?? 0) + 1;
   return counts;
 }
 
-export function getStudent(id: number) {
-  const row = getDb().prepare("SELECT * FROM students WHERE id = ?").get(id) as Row | undefined;
-  return row && toStudent(row);
+export async function getStudent(id: string) {
+  const doc = await students.doc(id).get();
+  return doc.exists ? toStudent(doc) : undefined;
 }
 
-export function createStudent(input: StudentInput, source: "intake" | "admin") {
-  const cols = INPUT_COLUMNS.join(", ");
-  const vals = INPUT_COLUMNS.map((c) => `@${c}`).join(", ");
-  const result = getDb()
-    .prepare(`INSERT INTO students (source, ${cols}) VALUES (@source, ${vals})`)
-    .run({ ...input, source });
-  return Number(result.lastInsertRowid);
+export async function createStudent(answers: StudentInput, source: "intake" | "admin") {
+  const ref = await students.add({
+    status: "enquiry",
+    source,
+    lessonRate: "",
+    answers,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return ref.id;
 }
 
-export function updateStudent(id: number, input: StudentInput) {
-  const sets = INPUT_COLUMNS.map((c) => `${c} = @${c}`).join(", ");
-  getDb()
-    .prepare(`UPDATE students SET ${sets}, updated_at = datetime('now') WHERE id = @id`)
-    .run({ ...input, id });
+export async function updateStudent(id: string, answers: StudentInput) {
+  await students.doc(id).update({ answers, updatedAt: FieldValue.serverTimestamp() });
 }
 
-export function updateCrmFields(id: number, fields: { status: Status; lesson_rate: string }) {
-  getDb()
-    .prepare("UPDATE students SET status = @status, lesson_rate = @lesson_rate, updated_at = datetime('now') WHERE id = @id")
-    .run({ ...fields, id });
+export async function updateCrmFields(id: string, fields: { status: Status; lesson_rate: string }) {
+  await students.doc(id).update({
+    status: fields.status,
+    lessonRate: fields.lesson_rate,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
 }
 
-export function deleteStudent(id: number) {
-  getDb().prepare("DELETE FROM students WHERE id = ?").run(id);
+export async function deleteStudent(id: string) {
+  // Removes the student and their notes subcollection.
+  await db.recursiveDelete(students.doc(id));
 }
 
-export function listNotes(studentId: number) {
-  return getDb()
-    .prepare("SELECT * FROM notes WHERE student_id = ? ORDER BY created_at DESC, id DESC")
-    .all(studentId) as Note[];
+export async function listNotes(studentId: string) {
+  const snapshot = await notesOf(studentId).orderBy("createdAt", "desc").get();
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return { id: doc.id, created_at: iso(data.createdAt), kind: data.kind, body: data.body } as Note;
+  });
 }
 
-export function addNote(studentId: number, kind: string, body: string) {
-  getDb().prepare("INSERT INTO notes (student_id, kind, body) VALUES (?, ?, ?)").run(studentId, kind, body);
+export async function addNote(studentId: string, kind: string, body: string) {
+  await notesOf(studentId).add({ kind, body, createdAt: FieldValue.serverTimestamp() });
 }
 
-export function deleteNote(id: number) {
-  getDb().prepare("DELETE FROM notes WHERE id = ?").run(id);
+export async function deleteNote(studentId: string, noteId: string) {
+  await notesOf(studentId).doc(noteId).delete();
 }

@@ -5,9 +5,9 @@ export const studio = {
 
 export function formatDate(value: string, withTime = false) {
   if (!value) return "";
-  // SQLite datetime('now') is UTC without a zone marker; bare dates (YYYY-MM-DD) are calendar dates.
+  // Bare dates (YYYY-MM-DD) are calendar dates; everything else is an ISO timestamp.
   const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
-  const date = new Date(isDateOnly ? `${value}T00:00:00Z` : `${value.replace(" ", "T")}Z`);
+  const date = new Date(isDateOnly ? `${value}T00:00:00Z` : value);
   return date.toLocaleString("en-AU", {
     timeZone: isDateOnly ? "UTC" : studio.timeZone,
     day: "numeric",

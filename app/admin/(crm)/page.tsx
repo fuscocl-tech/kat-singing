@@ -9,8 +9,7 @@ import { listStudents, statusCounts } from "@/lib/students";
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
   await requireAdmin();
   const { q = "", status = "" } = await searchParams;
-  const rows = listStudents({ q: q.trim(), status });
-  const counts = statusCounts();
+  const [rows, counts] = await Promise.all([listStudents({ q: q.trim(), status }), statusCounts()]);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
   const tabHref = (value: string) => {

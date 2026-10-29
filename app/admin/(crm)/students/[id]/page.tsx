@@ -12,11 +12,10 @@ const LINK_PREFIX: Record<string, string> = { email: "mailto:", tel: "tel:" };
 
 export default async function StudentPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
-  const id = Number((await params).id);
-  const s = getStudent(id);
+  const { id } = await params;
+  const [s, notes] = await Promise.all([getStudent(id), listNotes(id)]);
   if (!s) notFound();
   const a = s.answers;
-  const notes = listNotes(id);
   const age = ageFrom(a.date_of_birth);
   const kindLabel = (k: string) => NOTE_KINDS.find((n) => n.value === k)?.label ?? k;
   const wantsPrivateChat = a.voice_flags.includes("prefer to discuss my voice or health history privately");

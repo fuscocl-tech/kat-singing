@@ -22,48 +22,48 @@ export async function createStudentAction(prev: FormState, formData: FormData): 
   await requireAdmin();
   const { input, values, errors } = parseStudentForm(formData, "admin");
   if (Object.keys(errors).length) return { errors, values, attempt: (prev?.attempt ?? 0) + 1 };
-  const id = students.createStudent(input, "admin");
+  const id = await students.createStudent(input, "admin");
   redirect(`/admin/students/${id}`);
 }
 
-export async function updateStudentAction(id: number, prev: FormState, formData: FormData): Promise<FormState> {
+export async function updateStudentAction(id: string, prev: FormState, formData: FormData): Promise<FormState> {
   await requireAdmin();
   const { input, values, errors } = parseStudentForm(formData, "admin");
   if (Object.keys(errors).length) return { errors, values, attempt: (prev?.attempt ?? 0) + 1 };
-  students.updateStudent(id, input);
+  await students.updateStudent(id, input);
   revalidatePath(`/admin/students/${id}`);
   redirect(`/admin/students/${id}`);
 }
 
-export async function updateCrmAction(id: number, formData: FormData) {
+export async function updateCrmAction(id: string, formData: FormData) {
   await requireAdmin();
   const status = String(formData.get("status"));
   if (!STATUSES.some((s) => s.value === status)) return;
-  students.updateCrmFields(id, {
+  await students.updateCrmFields(id, {
     status: status as Status,
     lesson_rate: String(formData.get("lesson_rate") ?? "").trim().slice(0, 100),
   });
   revalidatePath(`/admin/students/${id}`);
 }
 
-export async function addNoteAction(studentId: number, formData: FormData) {
+export async function addNoteAction(studentId: string, formData: FormData) {
   await requireAdmin();
   const body = String(formData.get("body") ?? "").trim().slice(0, 10000);
   const kind = String(formData.get("kind"));
   if (!body || !NOTE_KINDS.some((k) => k.value === kind)) return;
-  students.addNote(studentId, kind, body);
+  await students.addNote(studentId, kind, body);
   revalidatePath(`/admin/students/${studentId}`);
 }
 
-export async function deleteNoteAction(studentId: number, noteId: number) {
+export async function deleteNoteAction(studentId: string, noteId: string) {
   await requireAdmin();
-  students.deleteNote(noteId);
+  await students.deleteNote(studentId, noteId);
   revalidatePath(`/admin/students/${studentId}`);
 }
 
-export async function deleteStudentAction(id: number, formData: FormData) {
+export async function deleteStudentAction(id: string, formData: FormData) {
   await requireAdmin();
   if (formData.get("confirm") !== "on") return;
-  students.deleteStudent(id);
+  await students.deleteStudent(id);
   redirect("/admin");
 }

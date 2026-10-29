@@ -8,8 +8,8 @@ import { deleteStudentAction, updateStudentAction } from "../../../../actions";
 
 export default async function EditStudentPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
-  const id = Number((await params).id);
-  const student = getStudent(id);
+  const { id } = await params;
+  const student = await getStudent(id);
   if (!student) notFound();
 
   return (

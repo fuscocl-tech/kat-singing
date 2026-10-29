@@ -14,13 +14,15 @@ export async function GET() {
   if (!(await isAdmin())) return new Response("Unauthorized", { status: 401 });
 
   const header = ["ID", "Status", "Lesson rate", "Added", ...ALL_FIELDS.map((f) => f.label), "Teacher notes"];
-  const lines = listStudents({}).map((s) => [
+  const rows = await listStudents();
+  const notes = await Promise.all(rows.map((s) => listNotes(s.id)));
+  const lines = rows.map((s, i) => [
     s.id,
     statusLabel(s.status),
     s.lesson_rate,
     s.created_at,
     ...ALL_FIELDS.map((f) => s.answers[f.name]),
-    listNotes(s.id)
+    notes[i]
       .map((n) => `[${n.created_at.slice(0, 10)} ${n.kind}] ${n.body}`)
       .join("\n"),
   ]);

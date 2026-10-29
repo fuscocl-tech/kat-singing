@@ -11,6 +11,6 @@ export async function submitIntake(prev: FormState, formData: FormData): Promise
   const { input, values, errors } = parseStudentForm(formData, "intake");
   if (Object.keys(errors).length) return { errors, values, attempt: (prev?.attempt ?? 0) + 1 };
 
-  createStudent(input, "intake");
+  await createStudent(input, "intake");
   redirect("/intake/thanks");
 }
