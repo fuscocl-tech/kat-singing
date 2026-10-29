@@ -1,11 +1,55 @@
 rules_version = '2';
 
-// Student records are read and written only by the app's server (firebase-admin),
-// which bypasses these rules. Nothing is reachable directly from a browser.
+// The intake form is public: anyone may CREATE a new student record, but only in the exact
+// shape the form produces. Reading, changing and deleting records is limited to the admin
+// Google accounts. Lines between the GENERATED markers come from `npm run rules`.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() in adminEmails();
+    }
+
+    // GENERATED:admins:start
+    function adminEmails() {
+      return ['fuscocl@gmail.com'];
+    }
+    // GENERATED:admins:end
+
+    // GENERATED:fields:start
+    function intakeFields() {
+      return ['full_name', 'preferred_name', 'pronouns', 'date_of_birth', 'suburb_postcode', 'phone', 'email', 'school_year', 'preferred_lesson_time', 'guardian_name', 'guardian_phone', 'guardian_email', 'guardian2_name', 'guardian2_contact', 'emergency_name', 'emergency_phone', 'voice_flags', 'voice_details', 'voice_demands', 'had_lessons', 'lessons_duration', 'ensemble_experience', 'instruments', 'performance_experience', 'reads_music', 'practice_frequency', 'learning_history', 'genres', 'favourite_artists', 'songs_to_learn', 'songs_to_avoid', 'languages', 'goal_areas', 'goal_other', 'top_goals', 'upcoming_event', 'success_factors', 'learning_style', 'access_needs', 'practice_time', 'anything_else', 'signature_name', 'signature_date'];
+    }
+    // GENERATED:fields:end
+
+    function isText(value, maxLength) {
+      return value is string && value.size() <= maxLength;
+    }
+
+    function isValidIntake() {
+      let data = request.resource.data;
+      let answers = data.answers;
+      return data.keys().hasOnly(['status', 'source', 'lessonRate', 'answers', 'createdAt', 'updatedAt'])
+        && data.status == 'enquiry'
+        && data.source == 'intake'
+        && data.lessonRate == ''
+        && data.createdAt == request.time
+        && data.updatedAt == request.time
+        && answers is map
+        && answers.keys().hasOnly(intakeFields())
+        && isText(answers.full_name, 200) && answers.full_name.size() > 0
+        && isText(answers.signature_name, 200) && answers.signature_name.size() > 0;
+    }
+
+    match /students/{studentId} {
+      allow create: if isAdmin() || isValidIntake();
+      allow read, update, delete: if isAdmin();
+
+      match /notes/{noteId} {
+        allow read, write: if isAdmin();
+      }
     }
   }
 }

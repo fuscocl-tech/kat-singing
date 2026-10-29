@@ -10,3 +10,5 @@ data/
 # Never commit Firebase service account keys
 *service-account*.json
 *firebase-adminsdk*.json
+/out/
+.env.development.local

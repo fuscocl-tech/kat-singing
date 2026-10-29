@@ -1,54 +1,79 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { StatusPill } from "@/components/StatusPill";
-import { requireAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/config";
+import { downloadStudentsCsv } from "@/lib/csv";
 import { STATUSES } from "@/lib/options";
 import { ageFrom, displayName } from "@/lib/student-form";
-import { listStudents, statusCounts } from "@/lib/students";
+import { filterStudents, listStudents, statusCounts } from "@/lib/students";
+import { useLoad } from "@/lib/use-load";
 
-export default async function Dashboard({ searchParams }: { searchParams: Promise<{ q?: string; status?: string }> }) {
-  await requireAdmin();
-  const { q = "", status = "" } = await searchParams;
-  const [rows, counts] = await Promise.all([listStudents({ q: q.trim(), status }), statusCounts()]);
-  const total = Object.values(counts).reduce((a, b) => a + b, 0);
+export default function Dashboard() {
+  const { data: all, error } = useLoad(listStudents, []);
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("");
+  const [exporting, setExporting] = useState(false);
 
-  const tabHref = (value: string) => {
-    const params = new URLSearchParams();
-    if (value) params.set("status", value);
-    if (q) params.set("q", q);
-    const qs = params.toString();
-    return qs ? `/admin?${qs}` : "/admin";
-  };
+  if (error) return <div className="alert">{error}</div>;
+  if (!all) return <p className="muted">Loading students…</p>;
+
+  const rows = filterStudents(all, { q, status });
+  const counts = statusCounts(all);
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      await downloadStudentsCsv(all ?? []);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <>
       <div className="page-head">
         <h1>Students</h1>
-        <form className="search" action="/admin">
-          {status && <input type="hidden" name="status" value={status} />}
-          <input type="search" name="q" defaultValue={q} placeholder="Search name, email, phone…" aria-label="Search" />
-        </form>
+        <div className="head-actions">
+          <input
+            type="search"
+            className="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name, email, phone…"
+            aria-label="Search"
+          />
+          <button type="button" className="btn" onClick={exportCsv} disabled={exporting || all.length === 0}>
+            {exporting ? "Exporting…" : "Export CSV"}
+          </button>
+        </div>
       </div>
 
       <nav className="tabs" aria-label="Filter by status">
-        <Link href={tabHref("")} className={status ? "" : "active"}>
-          All <span className="count">{total}</span>
-        </Link>
+        <button type="button" onClick={() => setStatus("")} className={status ? "" : "active"}>
+          All <span className="count">{all.length}</span>
+        </button>
         {STATUSES.map((s) => (
-          <Link key={s.value} href={tabHref(s.value)} className={status === s.value ? "active" : ""}>
+          <button
+            type="button"
+            key={s.value}
+            onClick={() => setStatus(s.value)}
+            className={status === s.value ? "active" : ""}
+          >
             {s.label} <span className="count">{counts[s.value] ?? 0}</span>
-          </Link>
+          </button>
         ))}
       </nav>
 
       {rows.length === 0 ? (
         <div className="empty card">
-          {total === 0 ? (
+          {all.length === 0 ? (
             <>
               <p>No students yet.</p>
               <p className="muted">
                 Share the <a href="/intake">intake form</a> with new students, or{" "}
-                <Link href="/admin/students/new">add one yourself</Link>.
+                <Link href="/admin/new">add one yourself</Link>.
               </p>
             </>
           ) : (
@@ -72,7 +97,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               {rows.map(({ id, status, created_at, answers: a }) => (
                 <tr key={id}>
                   <td>
-                    <Link href={`/admin/students/${id}`} className="row-link">
+                    <Link href={`/admin/student?id=${id}`} className="row-link">
                       {displayName(a)}
                     </Link>
                     {a.guardian_name && <div className="muted small">{a.guardian_name}</div>}

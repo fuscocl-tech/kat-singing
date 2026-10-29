@@ -121,12 +121,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .page-head h1 { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .page-head p { margin: 6px 0 0; }
 .back { display: inline-block; margin-bottom: 6px; font-size: 0.9rem; text-decoration: none; }
-.search input { width: 280px; max-width: 100%; }
+.head-actions .search { width: 260px; max-width: 100%; }
 
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-.tabs a { padding: 6px 12px; border-radius: 999px; color: var(--text); text-decoration: none; font-size: 0.9rem; border: 1px solid transparent; }
-.tabs a:hover { border-color: var(--border); }
-.tabs a.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+.tabs button { font: inherit; background: none; cursor: pointer; padding: 6px 12px; border-radius: 999px; color: var(--text); font-size: 0.9rem; border: 1px solid transparent; }
+.tabs button:hover { border-color: var(--border); }
+.tabs button.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+.head-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .count { color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 2px; }
 
 .table-wrap { padding: 0; overflow-x: auto; }
@@ -162,7 +163,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
 .timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .timeline li { padding: 14px 0; border-top: 1px solid var(--border); }
 .timeline-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 0.85rem; color: var(--muted); }
-.timeline-meta form { margin-left: auto; }
+.timeline-meta > :last-child { margin-left: auto; }
 .kind { font-weight: 600; color: var(--accent-strong); }
 .kind-payment { color: #1f6b3a; }
 .kind-call { color: #234f97; }

@@ -1,5 +1,18 @@
-import "server-only";
-import { FieldValue, Timestamp, type DocumentSnapshot } from "firebase-admin/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  Timestamp,
+  updateDoc,
+  writeBatch,
+  type DocumentSnapshot,
+} from "firebase/firestore";
 import { db } from "./firebase";
 import { ALL_FIELDS, type StudentInput } from "./student-form";
 import { STATUSES, type Status } from "./options";
@@ -7,6 +20,7 @@ import { STATUSES, type Status } from "./options";
 // Firestore layout:
 //   students/{id}              { status, source, lessonRate, answers: {…}, createdAt, updatedAt }
 //   students/{id}/notes/{id}   { kind, body, createdAt }
+// firestore.rules lets anyone create an intake submission; everything else is admin-only.
 
 export type Student = {
   id: string;
@@ -26,20 +40,20 @@ export type Note = {
   body: string;
 };
 
-const students = db.collection("students");
-const notesOf = (studentId: string) => students.doc(studentId).collection("notes");
+const students = collection(db, "students");
+const notesOf = (studentId: string) => collection(db, "students", studentId, "notes");
 
 function iso(value: unknown) {
   return value instanceof Timestamp ? value.toDate().toISOString() : "";
 }
 
-function toStudent(doc: DocumentSnapshot): Student {
-  const data = doc.data() ?? {};
+function toStudent(snapshot: DocumentSnapshot): Student {
+  const data = snapshot.data() ?? {};
   const stored = (data.answers ?? {}) as Record<string, unknown>;
   const answers: StudentInput = {};
   for (const field of ALL_FIELDS) answers[field.name] = String(stored[field.name] ?? "");
   return {
-    id: doc.id,
+    id: snapshot.id,
     created_at: iso(data.createdAt),
     updated_at: iso(data.updatedAt),
     status: data.status ?? "enquiry",
@@ -49,16 +63,19 @@ function toStudent(doc: DocumentSnapshot): Student {
   };
 }
 
-async function allStudents() {
-  const snapshot = await students.orderBy("createdAt", "desc").get();
-  return snapshot.docs.map(toStudent);
+/** All students, new enquiries first, then newest first. */
+export async function listStudents() {
+  const snapshot = await getDocs(query(students, orderBy("createdAt", "desc")));
+  return snapshot.docs
+    .map(toStudent)
+    .sort((x, y) => Number(y.status === "enquiry") - Number(x.status === "enquiry"));
 }
 
 // A teaching studio has at most a few hundred students, so filtering in memory is simpler
 // than maintaining Firestore indexes for every search.
-export async function listStudents({ q, status }: { q?: string; status?: string } = {}) {
-  const needle = q?.toLowerCase();
-  return (await allStudents())
+export function filterStudents(all: Student[], { q, status }: { q?: string; status?: string }) {
+  const needle = q?.trim().toLowerCase();
+  return all
     .filter((s) => !status || s.status === status)
     .filter((s) => {
       if (!needle) return true;
@@ -67,62 +84,66 @@ export async function listStudents({ q, status }: { q?: string; status?: string 
         .join(" ")
         .toLowerCase()
         .includes(needle);
-    })
-    .sort((x, y) => Number(y.status === "enquiry") - Number(x.status === "enquiry"));
+    });
 }
 
-export async function statusCounts() {
+export function statusCounts(all: Student[]) {
   const counts = Object.fromEntries(STATUSES.map((s) => [s.value, 0])) as Record<string, number>;
-  for (const s of await allStudents()) counts[s.status] = (counts[s.status] ?? 0) + 1;
+  for (const s of all) counts[s.status] = (counts[s.status] ?? 0) + 1;
   return counts;
 }
 
 export async function getStudent(id: string) {
-  const doc = await students.doc(id).get();
-  return doc.exists ? toStudent(doc) : undefined;
+  const snapshot = await getDoc(doc(students, id));
+  return snapshot.exists() ? toStudent(snapshot) : null;
 }
 
+/** The shape here must match isValidIntake() in firestore.rules. */
 export async function createStudent(answers: StudentInput, source: "intake" | "admin") {
-  const ref = await students.add({
+  const ref = await addDoc(students, {
     status: "enquiry",
     source,
     lessonRate: "",
     answers,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
   return ref.id;
 }
 
 export async function updateStudent(id: string, answers: StudentInput) {
-  await students.doc(id).update({ answers, updatedAt: FieldValue.serverTimestamp() });
+  await updateDoc(doc(students, id), { answers, updatedAt: serverTimestamp() });
 }
 
 export async function updateCrmFields(id: string, fields: { status: Status; lesson_rate: string }) {
-  await students.doc(id).update({
+  await updateDoc(doc(students, id), {
     status: fields.status,
     lessonRate: fields.lesson_rate,
-    updatedAt: FieldValue.serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
 }
 
 export async function deleteStudent(id: string) {
-  // Removes the student and their notes subcollection.
-  await db.recursiveDelete(students.doc(id));
+  // Firestore doesn't delete subcollections with their parent, so remove the notes too.
+  const notes = await getDocs(notesOf(id));
+  const batch = writeBatch(db);
+  for (const note of notes.docs) batch.delete(note.ref);
+  batch.delete(doc(students, id));
+  await batch.commit();
 }
 
 export async function listNotes(studentId: string) {
-  const snapshot = await notesOf(studentId).orderBy("createdAt", "desc").get();
-  return snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return { id: doc.id, created_at: iso(data.createdAt), kind: data.kind, body: data.body } as Note;
+  const snapshot = await getDocs(query(notesOf(studentId), orderBy("createdAt", "desc")));
+  return snapshot.docs.map((d) => {
+    const data = d.data();
+    return { id: d.id, created_at: iso(data.createdAt), kind: data.kind, body: data.body } as Note;
   });
 }
 
 export async function addNote(studentId: string, kind: string, body: string) {
-  await notesOf(studentId).add({ kind, body, createdAt: FieldValue.serverTimestamp() });
+  await addDoc(notesOf(studentId), { kind, body, createdAt: serverTimestamp() });
 }
 
 export async function deleteNote(studentId: string, noteId: string) {
-  await notesOf(studentId).doc(noteId).delete();
+  await deleteDoc(doc(notesOf(studentId), noteId));
 }

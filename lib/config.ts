@@ -1,6 +1,6 @@
 export const studio = {
-  name: process.env.STUDIO_NAME || "Kat's Singing Studio",
-  timeZone: process.env.STUDIO_TIMEZONE || "Australia/Sydney",
+  name: "Kat's Singing Studio",
+  timeZone: "Australia/Sydney",
 };
 
 export function formatDate(value: string, withTime = false) {

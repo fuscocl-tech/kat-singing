@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import {
   FORM_SECTIONS,
+  parseStudentForm,
   type Field,
   type FormErrors,
   type FormState,
@@ -17,15 +18,31 @@ type Props = {
 };
 
 export function StudentForm({ action, initialValues = {}, mode, submitLabel }: Props) {
-  const [state, formAction, pending] = useActionState(action, null);
+  const [state, formAction, pending] = useActionState(async (prev: FormState, formData: FormData) => {
+    try {
+      return await action(prev, formData);
+    } catch (e) {
+      console.error(e);
+      return {
+        errors: { form: "Sorry, that couldn't be saved. Please check your connection and try again." },
+        values: parseStudentForm(formData, mode).values,
+        attempt: (prev?.attempt ?? 0) + 1,
+      };
+    }
+  }, null);
   const values = state?.values ?? initialValues;
-  const errors = state?.errors ?? {};
+  const { form: formError, ...errors } = state?.errors ?? {};
   const errorCount = Object.keys(errors).length;
   const intake = mode === "intake";
 
   return (
     // Remount after each failed attempt so inputs pick up the values the server sent back.
     <form action={formAction} key={state?.attempt ?? 0} className="student-form" noValidate>
+      {formError && (
+        <div className="alert" role="alert">
+          {formError}
+        </div>
+      )}
       {errorCount > 0 && (
         <div className="alert" role="alert">
           Please check the {errorCount === 1 ? "highlighted field" : `${errorCount} highlighted fields`} below.
