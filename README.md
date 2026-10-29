@@ -14,7 +14,11 @@ A small CRM and new-student intake form for a singing teacher. It runs entirely 
   After submitting, the visitor lands on a thank-you page (`/intake/thanks`).
 - **`/admin`** is the teacher's CRM. Kat signs in with her Google account. It has:
   - a student list with status filters (New enquiry → Trial booked → Active / Waitlist / Paused / Former) and search
-  - a record page for each student with their full intake answers, status and lesson rate
+  - a page for each student with three tabs:
+    - **Profile**: general details, plus a singing profile the teacher fills in (voice type, range, strengths, focus), shown alongside the relevant intake answers
+    - **Songs & resources**: songs they're currently singing, suggested for later, and learned, plus a resource bank of links (sheet music, backing tracks, videos)
+    - **Intake form**: their full original answers
+  - status and lesson rate for each student
   - a teacher notes and lesson log for each student
   - adding and editing students by hand, and deleting them (with their notes)
   - a CSV export of every student, including their notes

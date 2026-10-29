@@ -57,7 +57,7 @@ function EditStudentPage() {
 
       <form onSubmit={remove} className="card danger stack">
         <h2>Delete student</h2>
-        <p className="muted">This permanently removes the student and all their notes.</p>
+        <p className="muted">This permanently removes the student and all their notes, songs and resources.</p>
         <label className="check">
           <input type="checkbox" name="confirm" required /> Yes, delete {name}
         </label>

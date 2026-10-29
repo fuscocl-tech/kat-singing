@@ -16,10 +16,12 @@ import {
 import { db } from "./firebase";
 import { ALL_FIELDS, type StudentInput } from "./student-form";
 import { STATUSES, type Status } from "./options";
+import { PROFILE_FIELDS, type Profile } from "./profile";
 
 // Firestore layout:
-//   students/{id}              { status, source, lessonRate, answers: {…}, createdAt, updatedAt }
+//   students/{id}              { status, source, lessonRate, answers: {…}, profile: {…}, createdAt, updatedAt }
 //   students/{id}/notes/{id}   { kind, body, createdAt }
+//   students/{id}/songs, students/{id}/resources: see lib/repertoire.ts
 // firestore.rules lets anyone create an intake submission; everything else is admin-only.
 
 export type Student = {
@@ -31,6 +33,8 @@ export type Student = {
   lesson_rate: string;
   /** Intake answers keyed by field name (see lib/student-form.ts). */
   answers: StudentInput;
+  /** The teacher's singing profile keyed by field name (see lib/profile.ts). */
+  profile: Profile;
 };
 
 export type Note = {
@@ -43,7 +47,7 @@ export type Note = {
 const students = collection(db, "students");
 const notesOf = (studentId: string) => collection(db, "students", studentId, "notes");
 
-function iso(value: unknown) {
+export function iso(value: unknown) {
   return value instanceof Timestamp ? value.toDate().toISOString() : "";
 }
 
@@ -52,6 +56,9 @@ function toStudent(snapshot: DocumentSnapshot): Student {
   const stored = (data.answers ?? {}) as Record<string, unknown>;
   const answers: StudentInput = {};
   for (const field of ALL_FIELDS) answers[field.name] = String(stored[field.name] ?? "");
+  const storedProfile = (data.profile ?? {}) as Record<string, unknown>;
+  const profile: Profile = {};
+  for (const field of PROFILE_FIELDS) profile[field.name] = String(storedProfile[field.name] ?? "");
   return {
     id: snapshot.id,
     created_at: iso(data.createdAt),
@@ -60,6 +67,7 @@ function toStudent(snapshot: DocumentSnapshot): Student {
     source: data.source ?? "intake",
     lesson_rate: data.lessonRate ?? "",
     answers,
+    profile,
   };
 }
 
@@ -123,11 +131,17 @@ export async function updateCrmFields(id: string, fields: { status: Status; less
   });
 }
 
+export async function updateProfile(id: string, profile: Profile) {
+  await updateDoc(doc(students, id), { profile, updatedAt: serverTimestamp() });
+}
+
 export async function deleteStudent(id: string) {
-  // Firestore doesn't delete subcollections with their parent, so remove the notes too.
-  const notes = await getDocs(notesOf(id));
+  // Firestore doesn't delete subcollections with their parent, so remove them too.
+  const children = await Promise.all(
+    ["notes", "songs", "resources"].map((name) => getDocs(collection(db, "students", id, name))),
+  );
   const batch = writeBatch(db);
-  for (const note of notes.docs) batch.delete(note.ref);
+  for (const child of children.flatMap((c) => c.docs)) batch.delete(child.ref);
   batch.delete(doc(students, id));
   await batch.commit();
 }

@@ -46,7 +46,8 @@ service cloud.firestore {
       allow create: if isAdmin() || isValidIntake();
       allow read, update, delete: if isAdmin();
 
-      match /notes/{noteId} {
+      // Teacher notes, songs and resources.
+      match /{subcollection}/{docId} {
         allow read, write: if isAdmin();
       }
     }

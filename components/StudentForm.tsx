@@ -90,7 +90,7 @@ export function StudentForm({ action, initialValues = {}, mode, submitLabel }: P
 
 type InputProps = { field: Field; values: FormValues; errors: FormErrors; required?: boolean };
 
-function FieldInput({ field, values, errors, required }: InputProps) {
+export function FieldInput({ field, values, errors, required }: InputProps) {
   const { name, label, type, options = [], hint, half } = field;
   const error = errors[name];
   const raw = values[name];
